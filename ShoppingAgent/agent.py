@@ -7,6 +7,9 @@ from pydantic import BaseModel,Field
 import json
 import uuid
 import asyncio
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Allow import of sibling folders
+from catalogAgent.CatalogAgent import create_catalog_agent
 
 async def main():
     load_dotenv() #load env file (api key, etc..)
@@ -57,6 +60,7 @@ async def main():
     message=types.Content(
         role="user",parts=[types.Part(text="what do you Recommend as a product based on user history")]
     )
+    recommended_product = None
     for event in runner.run(
         user_id=UserId,
         session_id=SessionId,
@@ -69,19 +73,38 @@ async def main():
                 try:
                     data = json.loads(raw_output)
                     product = data.get("product", "Unknown")
+                    recommended_product = product
                     print(f"The recommended product is: {product}")
                     justification=data.get("justification", "Unknown")
                     print(f"The justification is: {justification}")
                 except json.JSONDecodeError:
                     print("Model did not return valid JSON.")
-    print("Session Event")
-    session=await session_memory.get_session(
-        app_name=AppName,
-        user_id=UserId,
-        session_id=SessionId,
-    )
-    print("Final session state")
-    for key, value in session.state.items():
-        print(f"{key}:{value}")
+    # print("Session Event")
+    # session=await session_memory.get_session(
+    #     app_name=AppName,
+    #     user_id=UserId,
+    #     session_id=SessionId,
+    # )
+    # print("Final session state")
+    # for key, value in session.state.items():
+    #     print(f"{key}:{value}")
+    if recommended_product:
+        print("\n Catalog Agent is now searching for similar items...")
+
+        catalog_agent = await create_catalog_agent(
+            session_service=session_memory,AppName=AppName,UserId=UserId,SessionId=SessionId,recommended_product=recommended_product
+        )
+
+        catalog_runner = Runner(agent=catalog_agent, app_name=AppName, session_service=session_memory)
+
+        catalog_message = types.Content(
+            role="user",
+            parts=[types.Part(text="Find similar products to the one recommended earlier.")]
+        )
+
+        for event in catalog_runner.run(user_id=UserId, session_id=SessionId, new_message=catalog_message):
+            if event.is_final_response() and event.content and event.content.parts:
+                print("\n Matching Catalog Items:")
+                print(event.content.parts[0].text)
 
 asyncio.run(main())

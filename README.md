@@ -6,3 +6,9 @@ The justification is: Based on your purchase history, you've shown interest in b
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 Phase two is to load catalog from this endpoint "https://fake-store-api.mock.beeceptor.com/api/products" that return products.
 then search for the recommended product in this catalog with condition that it has the same price range.
+like this:
+Catalog Agent is now searching for similar items...
+Matching Catalog Items:
+{
+"matched_products": ["Wireless Headphones", "Smartwatch", "Tablet"]
+}
