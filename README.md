@@ -69,3 +69,5 @@ User History is
 """
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
+Final phase is the last phase it consists of doing an UI for the agent.
+all by running "python agent.py" after navigating to the ShoppingAgent directory
