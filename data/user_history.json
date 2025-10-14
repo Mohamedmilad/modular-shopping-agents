@@ -1,0 +1,17 @@
+[
+    {
+        "product": "Bluetooth headphones",
+        "category": "electronics",
+        "price": 120
+    },
+    {
+        "product": "Running shoes",
+        "category": "sportswear",
+        "price": 80
+    },
+    {
+        "product": "Tablet",
+        "category": "Electronics",
+        "price": 299.99
+    }
+]
