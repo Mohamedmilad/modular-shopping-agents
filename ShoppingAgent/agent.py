@@ -173,7 +173,7 @@ async def main():
                 session = await session_memory.get_session(app_name=AppName, user_id=UserId, session_id=SessionId)
                 state = session.state
                 state["selected_product"] = selected_product
-                state["purchases"].append({"product": selected_product, "status": "success"})
+                # state["purchases"].append({"product": selected_product, "status": "success"})
                 await session_memory.create_session(app_name=AppName, user_id=UserId, session_id=SessionId, state=state)
 
             else:
@@ -219,6 +219,8 @@ async def main():
     for i in session.state['history']:
         show_text(json.dumps(i, indent=2), sender="ai")
         print(i)
+    show_text(json.dumps(f"Purchases are {session.state['purchases']}", indent=2), sender="ai")
+    print(f"Purchases are {session.state['purchases']}")
     save_history_to_json(session.state["history"])
 asyncio.run(main())
 start_ui_loop()
