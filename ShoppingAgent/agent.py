@@ -18,19 +18,30 @@ async def main():
     UserId="A123"
     SessionId=str(uuid.uuid4())
 
-    user_history={
+    # user_history={
+    #     "user_id": UserId,
+    #     "history": [
+    #         {"product": "Bluetooth headphones", "category": "electronics", "price": 120},
+    #         {"product": "Running shoes", "category": "sportswear", "price": 80}
+    #     ]
+    # }
+    initial_state = {
         "user_id": UserId,
         "history": [
             {"product": "Bluetooth headphones", "category": "electronics", "price": 120},
-            {"product": "Running shoes", "category": "sportswear", "price": 80}
-        ]
+            {"product": "Running shoes", "category": "sportswear", "price": 80},
+        ],
+        "recommended_product": None,
+        "catalog_products": [],
+        "selected_product": None,
+        "purchases": []
     }
 
     await session_memory.create_session(
         app_name=AppName,
         user_id=UserId,
         session_id=SessionId,
-        state=user_history,
+        state=initial_state,
     )
     class CapitalOutput(BaseModel):
         product: str=Field(description="only the name of the recommended product")
@@ -61,6 +72,7 @@ async def main():
         role="user",parts=[types.Part(text="what do you Recommend as a product based on user history")]
     )
     recommended_product = None
+    catalog_items = None
     for event in runner.run(
         user_id=UserId,
         session_id=SessionId,
@@ -69,11 +81,16 @@ async def main():
         if event.is_final_response():
             if event.content and event.content.parts:
                 raw_output=event.content.parts[0].text
-                # print(f"Final Response: {raw_output}")
                 try:
                     data = json.loads(raw_output)
                     product = data.get("product", "Unknown")
                     recommended_product = product
+
+                    session = await session_memory.get_session(app_name=AppName, user_id=UserId, session_id=SessionId)
+                    state = session.state
+                    state["recommended_product"] = recommended_product
+                    await session_memory.create_session(app_name=AppName, user_id=UserId, session_id=SessionId, state=state)
+                    print("the recommendation agent processing")
                     print(f"The recommended product is: {product}")
                     justification=data.get("justification", "Unknown")
                     print(f"The justification is: {justification}")
@@ -105,6 +122,69 @@ async def main():
         for event in catalog_runner.run(user_id=UserId, session_id=SessionId, new_message=catalog_message):
             if event.is_final_response() and event.content and event.content.parts:
                 print("\n Matching Catalog Items:")
-                print(event.content.parts[0].text)
+                data = json.loads(event.content.parts[0].text)
+                catalog_items = data.get("matched_products", [])
+                justify=data.get("justification")
+                session = await session_memory.get_session(app_name=AppName, user_id=UserId, session_id=SessionId)
+                state = session.state
+                state["catalog_products"] = catalog_items
+                await session_memory.create_session(app_name=AppName, user_id=UserId, session_id=SessionId, state=state)
+
+    if catalog_items:
+        for i, product in enumerate(catalog_items, 1):
+            print(f"{i}. {product['product']} - {product['category']} (${product['price']})")
+        print(justify)
+        
+        choice = input("\nEnter the number of the product you want to purchase (1-3): ")
+        
+        try:
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(catalog_items):
+                selected_product = catalog_items[choice_idx]
+                print(f"\nYou selected: {selected_product}")
+
+                session = await session_memory.get_session(app_name=AppName, user_id=UserId, session_id=SessionId)
+                state = session.state
+                state["selected_product"] = selected_product
+                state["purchases"].append({"product": selected_product, "status": "success"})
+                await session_memory.create_session(app_name=AppName, user_id=UserId, session_id=SessionId, state=state)
+
+            else:
+                print("Invalid choice. Defaulting to first product.")
+                selected_product = catalog_items[0]
+        except ValueError:
+            print("Invalid input. Defaulting to first product.")
+            selected_product = catalog_items[0]
+    from purchaseAgent.PurchaseAgent import create_purchase_agent
+
+    print("\n Processing simulated purchase...")
+
+    purchase_agent = await create_purchase_agent(
+        session_service=session_memory,
+        AppName=AppName,
+        UserId=UserId,
+        SessionId=SessionId,
+        selected_product=selected_product
+    )
+
+    purchase_runner = Runner(agent=purchase_agent, app_name=AppName, session_service=session_memory)
+
+    purchase_message = types.Content(
+        role="user",
+        parts=[types.Part(text=f"Purchase {selected_product}")]
+    )
+
+    for event in purchase_runner.run(user_id=UserId, session_id=SessionId, new_message=purchase_message):
+        if event.is_final_response() and event.content and event.content.parts:
+            print("\n Purchase agent processing:")
+            print(event.content.parts[0].text)
+            session = await session_memory.get_session(app_name=AppName, user_id=UserId, session_id=SessionId)
+            state = session.state
+            state['history'].append(state["selected_product"])
+            await session_memory.create_session(app_name=AppName, user_id=UserId, session_id=SessionId, state=state)
+    print("User History is \n")
+    for i in session.state['history']:
+        print(i)
+
 
 asyncio.run(main())
