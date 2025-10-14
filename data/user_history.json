@@ -10,8 +10,8 @@
         "price": 80
     },
     {
-        "product": "Tablet",
-        "category": "Electronics",
-        "price": 299.99
+        "product": "Smartwatch",
+        "category": "Wearables",
+        "price": 199.99
     }
 ]
